@@ -1,0 +1,13 @@
+# Dependances Python du projet.
+# Les versions exactes seront fixees lorsque les choix techniques seront valides.
+
+transformers
+datasets
+peft
+trl
+accelerate
+sentence-transformers
+faiss-cpu
+chromadb
+pyyaml
+tqdm

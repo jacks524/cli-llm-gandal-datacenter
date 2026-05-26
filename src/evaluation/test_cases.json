@@ -1,0 +1,6 @@
+[
+  {
+    "question": "Quel est le role du chatbot dans le data center ?",
+    "expected_answer": "Aider les utilisateurs a comprendre, diagnostiquer et exploiter le data center a partir des documents internes."
+  }
+]

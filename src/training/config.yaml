@@ -1,0 +1,17 @@
+# Configuration du fine-tuning LoRA/QLoRA.
+# Ce fichier centralise les parametres importants pour eviter de les coder en dur.
+
+model_name: "Qwen/Qwen2.5-0.5B-Instruct"
+dataset_path: "data/processed/train.jsonl"
+output_dir: "models/adapters/datacenter-lora"
+
+training:
+  epochs: 3
+  learning_rate: 0.0002
+  batch_size: 1
+  max_seq_length: 1024
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05

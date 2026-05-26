@@ -1,0 +1,25 @@
+# Environnements Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Donnees et modeles volumineux
+data/raw/*
+data/processed/*
+data/eval/*
+models/*
+
+# Garder les dossiers vides dans Git
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/eval/.gitkeep
+!models/adapters/
+!models/adapters/.gitkeep
+
+# Fichiers locaux
+.env
+.DS_Store
