@@ -1,0 +1,76 @@
+# ============================================================
+# RAG Index Configuration — Data Center LLM Chatbot
+# Task 6 : Responsable RAG Index
+# ============================================================
+
+# ── Embedding model ──────────────────────────────────────────
+embedding:
+  model_name: "BAAI/bge-m3"          # multilingual, 1024-dim, state-of-the-art
+  device: "cpu"                        # "cuda" if GPU available
+  batch_size: 32
+  normalize_embeddings: true
+  max_seq_length: 512
+
+# ── Chunking strategy ────────────────────────────────────────
+chunking:
+  strategy: "recursive"               # "fixed" | "recursive" | "semantic"
+  chunk_size: 512                     # tokens (not chars)
+  chunk_overlap: 64                   # overlap between consecutive chunks
+  separators:
+    - "\n\n"
+    - "\n"
+    - ". "
+    - " "
+  min_chunk_size: 50                  # discard chunks smaller than this
+
+# ── FAISS index ──────────────────────────────────────────────
+faiss:
+  index_type: "IVF"                   # "Flat" | "IVF" | "HNSW"
+  metric: "cosine"                    # "cosine" | "l2" | "ip"
+  nlist: 100                          # IVF: number of clusters (√N rule)
+  nprobe: 10                          # IVF: probes at query time (precision vs speed)
+  hnsw_m: 32                          # HNSW: neighbours per node
+  hnsw_ef_construction: 200
+
+# ── BM25 (hybrid search) ─────────────────────────────────────
+bm25:
+  enabled: true
+  k1: 1.5                             # term frequency saturation
+  b: 0.75                             # length normalization
+
+# ── Hybrid fusion ────────────────────────────────────────────
+hybrid:
+  alpha: 0.6                          # 0 = pure BM25, 1 = pure dense
+  rerank: false                       # set true if cross-encoder available
+  reranker_model: "cross-encoder/ms-marco-MiniLM-L-6-v2"
+
+# ── Retrieval ────────────────────────────────────────────────
+retrieval:
+  top_k: 5
+  score_threshold: 0.35               # minimum similarity score to include
+
+# ── Document sources ─────────────────────────────────────────
+sources:
+  data_dir: "data/raw"
+  processed_dir: "data/processed"
+  supported_extensions:
+    - ".txt"
+    - ".md"
+    - ".pdf"
+    - ".json"
+    - ".jsonl"
+    - ".csv"
+  recursive: true
+
+# ── Index persistence ────────────────────────────────────────
+index:
+  output_dir: "data/index"
+  index_name: "datacenter_rag"
+  save_metadata: true
+  overwrite: false                    # fail-safe: don't overwrite existing index
+
+# ── Logging ──────────────────────────────────────────────────
+logging:
+  level: "INFO"                       # DEBUG | INFO | WARNING | ERROR
+  log_file: "data/index/build.log"
+  rich_traceback: true

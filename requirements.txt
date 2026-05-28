@@ -11,3 +11,32 @@ faiss-cpu
 chromadb
 pyyaml
 tqdm
+
+
+
+# ============================================================
+# Task 6 – RAG Index | Dépendances Python
+# ============================================================
+
+# ── Core ─────────────────────────────────────────────────────
+numpy>=1.24.0
+#pyyaml>=6.0
+
+# ── Embeddings ───────────────────────────────────────────────
+#sentence-transformers>=2.7.0
+torch>=2.0.0               # CPU ou CUDA selon la machine
+#transformers>=4.40.0
+
+# ── Index vectoriel ──────────────────────────────────────────
+#faiss-cpu>=1.8.0            # remplacer par faiss-gpu si GPU disponible
+
+# ── Documents PDF (optionnel) ────────────────────────────────
+pypdf>=4.0.0
+
+# ── Tests ────────────────────────────────────────────────────
+pytest>=8.0.0
+pytest-cov>=5.0.0
+
+# ── Dev / Qualité ────────────────────────────────────────────
+black>=24.0.0
+ruff>=0.4.0

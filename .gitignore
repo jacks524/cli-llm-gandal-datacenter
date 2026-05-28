@@ -1,8 +1,16 @@
 # Environnements Python
 .venv/
 venv/
+env/
+.env
 __pycache__/
 *.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
 
 # Jupyter
 .ipynb_checkpoints/
@@ -20,6 +28,29 @@ models/*
 !models/adapters/
 !models/adapters/.gitkeep
 
-# Fichiers locaux
-.env
+# OS
 .DS_Store
+Thumbs.db
+
+
+
+# Index et modèles (volumineux)
+data/index/*.faiss
+data/index/*.pkl
+#models/
+
+# Logs
+*.log
+data/index/build.log
+
+# IDE
+.vscode/
+.idea/
+.qodo/
+*.swp
+*.swo
+
+# Tests
+.pytest_cache/
+.coverage
+htmlcov/
