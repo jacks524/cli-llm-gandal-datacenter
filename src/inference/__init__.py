@@ -1,0 +1,1 @@
+"""Inference locale du chatbot."""

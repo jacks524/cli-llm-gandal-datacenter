@@ -1,15 +1,18 @@
 # Configuration du fine-tuning LoRA/QLoRA.
-# Ce fichier centralise les parametres importants pour eviter de les coder en dur.
+# Important : on fine-tune le modele Transformers officiel, pas le fichier GGUF.
+# Le GGUF sert surtout a l'inference locale avec llama.cpp / llama-cpp-python.
 
 model_name: "Qwen/Qwen2.5-0.5B-Instruct"
-dataset_path: "data/processed/train.jsonl"
+dataset_path: "data/processed/train_clean.jsonl"
 output_dir: "models/adapters/datacenter-lora"
 
 training:
   epochs: 3
   learning_rate: 0.0002
   batch_size: 1
+  gradient_accumulation_steps: 4
   max_seq_length: 1024
+  dry_run: true
 
 lora:
   r: 16

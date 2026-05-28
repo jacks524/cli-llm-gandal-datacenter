@@ -11,3 +11,5 @@ faiss-cpu
 chromadb
 pyyaml
 tqdm
+llama-cpp-python
+huggingface_hub
