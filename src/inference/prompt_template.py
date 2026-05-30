@@ -7,6 +7,13 @@ Tu ne proposes jamais une commande destructive sans avertissement clair.
 """
 
 
+def build_prompt(question: str, context: str = "") -> str:
+    """Retourne le contenu du message utilisateur avec le contexte RAG."""
+    if context:
+        return f"Contexte documentaire:\n{context}\n\nQuestion:\n{question}"
+    return question
+
+
 def build_messages(question: str, context: str = "") -> list:
     """Construit la liste de messages pour le chat template du modele.
 
