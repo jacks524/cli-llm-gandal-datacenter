@@ -1,124 +1,123 @@
 """Interface de chat locale pour le LLM du data center.
 
-Lance une conversation offline avec le modele Qwen local,
-en combinant le contexte recupere par le RAG et l'adaptateur LoRA si disponible.
-
-Usage:
-    python -m src.inference.chat
+Le chat fonctionne en deux modes :
+- avec `llama-cpp-python` + modele GGUF local, il genere une vraie reponse LLM ;
+- sans modele, il reste utilisable en mode demo RAG et affiche une reponse
+  extractive basee sur les documents internes.
 """
 
-import sys
-import yaml
-import torch
+import argparse
 from pathlib import Path
 
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel
-
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT))
-
-from src.inference.prompt_template import build_messages
-from src.rag.retrieve import retrieve_context
-
-CONFIG_PATH   = ROOT / "src" / "training" / "config.yaml"
-BASE_MODEL_DIR = ROOT / "models" / "base"
-ADAPTER_DIR   = ROOT / "models" / "adapters" / "datacenter-lora"
+from src.common.paths import DEFAULT_INDEX_PATH, DEFAULT_MODEL_PATH
+from src.inference.prompt_template import SYSTEM_PROMPT, build_prompt
+from src.rag.retrieve import format_context, retrieve_context
 
 
-def _load_config() -> dict:
-    with open(CONFIG_PATH, encoding="utf-8") as f:
-        return yaml.safe_load(f)
+def resolve_model_path(model_path: Path):
+    """Retourne le modele demande ou le premier GGUF disponible dans models/base."""
+    if model_path.exists():
+        return model_path, None
+
+    candidates = sorted(model_path.parent.glob("*.gguf"))
+    if candidates:
+        return candidates[0], f"modele par defaut introuvable, utilisation de {candidates[0].name}"
+
+    return model_path, None
 
 
-def _model_source(config: dict) -> str:
-    """Retourne le chemin local si le modele est telecharge, sinon le nom HuggingFace."""
-    if BASE_MODEL_DIR.exists() and any(BASE_MODEL_DIR.iterdir()):
-        return str(BASE_MODEL_DIR)
-    return config["model_name"]
+def load_llm(model_path: Path, n_ctx: int):
+    """Charge le modele GGUF si llama-cpp-python est disponible."""
+    resolved_path, fallback_warning = resolve_model_path(model_path)
+    if not resolved_path.exists():
+        return None, f"modele GGUF introuvable: {resolved_path}"
+
+    try:
+        from llama_cpp import Llama
+    except ImportError:
+        return None, "llama-cpp-python n'est pas installe"
+
+    llm = Llama(model_path=str(resolved_path), n_ctx=n_ctx, verbose=False)
+    return llm, fallback_warning
 
 
-def load_model(config: dict):
-    """Charge le tokenizer et le modele (+ LoRA si disponible).
-
-    Returns:
-        tuple: (tokenizer, model) prets pour l'inference.
-    """
-    source = _model_source(config)
-    print(f"[INFO] Chargement du modele depuis : {source}")
-
-    tokenizer = AutoTokenizer.from_pretrained(source)
-    model = AutoModelForCausalLM.from_pretrained(source, torch_dtype=torch.float32)
-
-    if ADAPTER_DIR.exists():
-        print(f"[INFO] Chargement de l'adaptateur LoRA : {ADAPTER_DIR}")
-        model = PeftModel.from_pretrained(model, str(ADAPTER_DIR))
-    else:
-        print("[INFO] Aucun adaptateur LoRA trouve — utilisation du modele de base.")
-
-    model.eval()
-    return tokenizer, model
+def generate_with_llm(llm, question: str, context: str, max_tokens: int):
+    """Genere une reponse avec le modele local."""
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": build_prompt(question, context)},
+    ]
+    result = llm.create_chat_completion(messages=messages, max_tokens=max_tokens, temperature=0.2)
+    return result["choices"][0]["message"]["content"].strip()
 
 
-def generate_response(tokenizer, model, question: str, max_new_tokens: int = 512) -> str:
-    """Genere une reponse pour une question en integrant le contexte RAG.
-
-    Args:
-        tokenizer: Tokenizer du modele.
-        model: Modele charge (base ou fine-tune).
-        question: Question posee par l'utilisateur.
-        max_new_tokens: Nombre maximum de tokens a generer.
-
-    Returns:
-        Reponse textuelle generee par le modele.
-    """
-    passages = retrieve_context(question)
-    context = "\n".join(passages) if passages else ""
-
-    messages = build_messages(question, context)
-    prompt = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
-    )
-
-    inputs = tokenizer(prompt, return_tensors="pt")
-
-    with torch.inference_mode():
-        output_ids = model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=False,
-            pad_token_id=tokenizer.eos_token_id,
+def generate_demo_answer(question: str, passages):
+    """Reponse de secours quand le modele n'est pas encore branche."""
+    if not passages:
+        return (
+            "Je n'ai pas trouve de contexte dans la base documentaire locale. "
+            "Ajoute des documents dans data/raw/ puis relance l'indexation."
         )
 
-    new_tokens = output_ids[0][inputs["input_ids"].shape[1]:]
-    return tokenizer.decode(new_tokens, skip_special_tokens=True)
+    sources = ", ".join(sorted({item["source"] for item in passages}))
+    best_text = passages[0]["text"]
+    return (
+        "Mode demo RAG actif: le modele GGUF n'est pas encore charge.\n\n"
+        f"Question recue: {question}\n\n"
+        f"Contexte le plus pertinent trouve dans {sources}:\n"
+        f"{best_text}\n\n"
+        "Pour obtenir une vraie reponse generative, installe llama-cpp-python "
+        "et place le modele Qwen GGUF dans models/base/."
+    )
+
+
+def answer_question(question: str, model_path: Path, index_path: Path, top_k: int, max_tokens: int, n_ctx: int):
+    """Pipeline complet : retrieval puis generation ou reponse demo."""
+    passages = retrieve_context(question, top_k=top_k, index_path=index_path)
+    context = format_context(passages)
+    llm, error = load_llm(model_path, n_ctx=n_ctx)
+
+    if llm is None:
+        return generate_demo_answer(question, passages), error
+
+    return generate_with_llm(llm, question, context, max_tokens=max_tokens), None
 
 
 def main():
-    config = _load_config()
-    tokenizer, model = load_model(config)
+    """Point d'entree du chat local."""
+    parser = argparse.ArgumentParser(description="Chatbot offline du data center.")
+    parser.add_argument("--model", default=str(DEFAULT_MODEL_PATH))
+    parser.add_argument("--index", default=str(DEFAULT_INDEX_PATH))
+    parser.add_argument("--top-k", type=int, default=3)
+    parser.add_argument("--max-tokens", type=int, default=350)
+    parser.add_argument("--n-ctx", type=int, default=2048)
+    args = parser.parse_args()
 
-    print("\n=== Chatbot Data Center (offline) ===")
-    print("Tapez 'quitter' pour arreter.\n")
-
+    print("Assistant Data Center local. Tape 'exit' pour quitter.")
     while True:
-        try:
-            question = input("Vous : ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nAu revoir.")
+        question = input("\nVous> ").strip()
+        if question.lower() in {"exit", "quit", "q"}:
+            print("Assistant> Fin de session.")
             break
-
         if not question:
             continue
 
-        if question.lower() in ("quitter", "exit", "quit"):
-            print("Au revoir.")
-            break
+        try:
+            response, warning = answer_question(
+                question=question,
+                model_path=Path(args.model),
+                index_path=Path(args.index),
+                top_k=args.top_k,
+                max_tokens=args.max_tokens,
+                n_ctx=args.n_ctx,
+            )
+        except FileNotFoundError as exc:
+            print(f"Assistant> {exc}")
+            continue
 
-        print("Bot  : ", end="", flush=True)
-        reponse = generate_response(tokenizer, model, question)
-        print(reponse)
-        print()
+        if warning:
+            print(f"Info> {warning}")
+        print(f"Assistant> {response}")
 
 
 if __name__ == "__main__":

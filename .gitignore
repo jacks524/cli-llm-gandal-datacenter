@@ -8,15 +8,22 @@ __pycache__/
 .ipynb_checkpoints/
 
 # Donnees et modeles volumineux
-data/raw/*
 data/processed/*
 data/eval/*
+data/index/*
 models/*
+models/base/qwen2.5-0.5b-instruct-fp16.gguf
+*.gguf
+*.safetensors
+*.bin
 
 # Garder les dossiers vides dans Git
-!data/raw/.gitkeep
 !data/processed/.gitkeep
 !data/eval/.gitkeep
+!data/index/
+!data/index/.gitkeep
+!models/base/
+!models/base/.gitkeep
 !models/adapters/
 !models/adapters/.gitkeep
 
